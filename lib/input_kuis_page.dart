@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_application_3/buat_soal.dart';
-//import 'package:flutter_application_3/kelas.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:gallery_saver/gallery_saver.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class InputKuisPage extends StatefulWidget {
   const InputKuisPage({Key? key}) : super(key: key);
@@ -34,15 +36,15 @@ class _InputKuisPageState extends State<InputKuisPage> {
         _kuisList.clear();
         for (var row in response) {
           _kuisList.add({
-            'mata_kuliah': row['mata_kuliah'],
-            'kode_kuis': row['kode_kuis'],
+            'mata_kuliah': row['mata_kuliah'] ?? 'No Name',
+            'kode_kuis': row['kode_kuis'] ?? 'NOCODE',
           });
         }
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat kuis: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load quizzes: $e')),
+      );
     }
   }
 
@@ -52,9 +54,9 @@ class _InputKuisPageState extends State<InputKuisPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Tambah Kuis'),
+        title: const Text('Add Quiz'),
         content: TextField(
-          decoration: InputDecoration(hintText: 'Nama Mata Kuliah'),
+          decoration: const InputDecoration(hintText: 'Course Name'),
           onChanged: (value) => mata_kuliah = value,
         ),
         actions: [
@@ -75,12 +77,12 @@ class _InputKuisPageState extends State<InputKuisPage> {
                   Navigator.pop(context);
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal menyimpan kuis: $e')),
+                    SnackBar(content: Text('Failed to save quiz: $e')),
                   );
                 }
               }
             },
-            child: Text('Simpan'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -89,43 +91,126 @@ class _InputKuisPageState extends State<InputKuisPage> {
 
   String _generateKodeKuis() {
     final random = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-    return random.toRadixString(36);
+    return random.toRadixString(36).toUpperCase();
   }
 
-  void _showQRCode(String kode_kuis) {
+  void _showQRCode(String kodeKuis) {
+    if (kodeKuis.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid quiz code')),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('QR Code'),
-        content: QrImageView(
-          data: kode_kuis,
-          version: QrVersions.auto,
-          size: 200.0,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Tutup'),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Quiz Code: $kodeKuis',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: QrImageView(
+                  data: kodeKuis,
+                  version: QrVersions.auto,
+                  size: 200,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Colors.black,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _saveQrCodeToGallery(kodeKuis),
+                    child: const Text('Save QR'),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Future<void> _hapusKuis(String kode_kuis) async {
-    final confirm = await showDialog(
+  Future<void> _saveQrCodeToGallery(String kodeKuis) async {
+    try {
+      final qrPainter = QrPainter(
+        data: kodeKuis,
+        version: QrVersions.auto,
+        gapless: true,
+      );
+
+      final image = await qrPainter.toImageData(300);
+      if (image == null) return;
+
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/qr_$kodeKuis.png';
+      final file = File(filePath);
+      await file.writeAsBytes(image.buffer.asUint8List());
+
+      final success = await GallerySaver.saveImage(filePath);
+      if (success == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('QR Code saved to gallery')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save QR Code')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _hapusKuis(String kodeKuis) async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Hapus Kuis'),
-        content: Text('Yakin ingin menghapus kuis "$kode_kuis"?'),
+        title: const Text('Delete Quiz'),
+        content: Text('Are you sure to delete quiz "$kodeKuis"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Batal'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Hapus'),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -136,13 +221,13 @@ class _InputKuisPageState extends State<InputKuisPage> {
         await Supabase.instance.client
             .from('kelas')
             .delete()
-            .eq('kode_kuis', kode_kuis);
+            .eq('kode_kuis', kodeKuis);
 
         await _loadKuisFromSupabase();
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal menghapus kuis: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete quiz: $e')),
+        );
       }
     }
   }
@@ -150,9 +235,9 @@ class _InputKuisPageState extends State<InputKuisPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF7F3F9),
+      backgroundColor: const Color(0xFFF7F3F9),
       appBar: AppBar(
-        title: const Text('Input Kuis - Khusus Dosen'),
+        title: const Text('Quiz Input - Lecturer Only'),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -166,21 +251,24 @@ class _InputKuisPageState extends State<InputKuisPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('ListView', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Quiz List',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 ElevatedButton.icon(
                   onPressed: _tambahKuis,
-                  icon: Icon(Icons.add),
-                  label: Text('Tambah Kuis'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Quiz'),
                   style: ElevatedButton.styleFrom(
+                    elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    elevation: 2,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Expanded(
               child: ListView.builder(
                 itemCount: _kuisList.length,
@@ -197,18 +285,17 @@ class _InputKuisPageState extends State<InputKuisPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Mata kuliah : ${kuis['mata_kuliah']}'),
-                          Text('Kode Kuis : ${kuis['kode_kuis']}'),
-                          SizedBox(height: 8),
+                          Text('Course: ${kuis['mata_kuliah']}'),
+                          Text('Quiz Code: ${kuis['kode_kuis']}'),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
                               IconButton(
-                                icon: Icon(Icons.qr_code),
-                                onPressed: () =>
-                                    _showQRCode(kuis['kode_kuis']!),
+                                icon: const Icon(Icons.qr_code),
+                                onPressed: () => _showQRCode(kuis['kode_kuis']!),
                               ),
                               IconButton(
-                                icon: Icon(Icons.delete),
+                                icon: const Icon(Icons.delete),
                                 onPressed: () => _hapusKuis(kuis['kode_kuis']!),
                               ),
                               TextButton(
@@ -222,7 +309,7 @@ class _InputKuisPageState extends State<InputKuisPage> {
                                     ),
                                   );
                                 },
-                                child: Text('Buat soal'),
+                                child: const Text('Create Questions'),
                               ),
                             ],
                           ),
