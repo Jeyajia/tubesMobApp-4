@@ -55,17 +55,28 @@ class _InputKuisPageState extends State<InputKuisPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Tambah Kuis'),
+        title: const Text('Tambah Kuis', style: TextStyle(fontWeight: FontWeight.bold)),
         content: TextField(
-          decoration: const InputDecoration(hintText: 'Nama Mata Kuliah'),
+          decoration: InputDecoration(
+            hintText: 'Nama Mata Kuliah',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
           onChanged: (value) => mata_kuliah = value,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          TextButton(
+            child: const Text('Batal', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue[800],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             onPressed: () async {
               if (mata_kuliah.isNotEmpty) {
                 final kode_kuis = _generateKodeKuis();
@@ -87,7 +98,7 @@ class _InputKuisPageState extends State<InputKuisPage> {
                 }
               }
             },
-            child: const Text('Simpan'),
+            child: const Text('Simpan', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -116,17 +127,34 @@ class _InputKuisPageState extends State<InputKuisPage> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Kode Kuis: $kodeKuis'),
+              Text(
+                'Kode Kuis: $kodeKuis',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 20),
-              QrImageView(
-                data: kodeKuis,
-                version: QrVersions.auto,
-                size: 200,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: kodeKuis,
+                  version: QrVersions.auto,
+                  size: 200,
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -137,8 +165,14 @@ class _InputKuisPageState extends State<InputKuisPage> {
                     child: const Text('Tutup'),
                   ),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     onPressed: () => _saveQrCodeToGallery(kodeKuis),
-                    child: const Text('Simpan QR'),
+                    child: const Text('Simpan QR', style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
@@ -165,11 +199,17 @@ class _InputKuisPageState extends State<InputKuisPage> {
 
       await GallerySaver.saveImage(filePath);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('QR Code berhasil disimpan')),
+        const SnackBar(
+          content: Text('QR Code berhasil disimpan'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menyimpan QR: $e')),
+        SnackBar(
+          content: Text('Gagal menyimpan QR: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -178,16 +218,22 @@ class _InputKuisPageState extends State<InputKuisPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Hapus Kuis'),
+        title: const Text('Hapus Kuis', style: TextStyle(fontWeight: FontWeight.bold)),
         content: const Text('Apakah Anda yakin ingin menghapus kuis ini?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -203,7 +249,10 @@ class _InputKuisPageState extends State<InputKuisPage> {
         await _loadKuisFromSupabase();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus kuis: $e')),
+          SnackBar(
+            content: Text('Gagal menghapus kuis: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -213,65 +262,100 @@ class _InputKuisPageState extends State<InputKuisPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daftar Kuis'),
+        title: const Text('Daftar Kuis', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, color: Colors.white),
             onPressed: _tambahKuis,
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: _kuisList.length,
-        itemBuilder: (context, index) {
-          final kuis = _kuisList[index];
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+      body: _kuisList.isEmpty
+          ? Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          kuis['mata_kuliah'],
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => _editKuisDanSoal(kuis),
-                      ),
-                    ],
+                  Image.asset('assets/images/empty.png', height: 150),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Belum ada kuis',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
                   ),
-                  Text('Kode: ${kuis['kode_kuis']}'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.qr_code),
-                        onPressed: () => _showQRCode(kuis['kode_kuis']),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () => _hapusKuis(kuis['kode_kuis']),
-                      ),
-                      const Spacer(),
-                      ElevatedButton(
-                        onPressed: () => _editKuisDanSoal(kuis),
-                        child: const Text('Kelola Soal'),
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: _tambahKuis,
+                    child: const Text('Tambah Kuis Baru'),
                   ),
                 ],
               ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: _kuisList.length,
+              itemBuilder: (context, index) {
+                final kuis = _kuisList[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                kuis['mata_kuliah'],
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _editKuisDanSoal(kuis),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Kode: ${kuis['kode_kuis']}',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.qr_code, color: Colors.green),
+                              onPressed: () => _showQRCode(kuis['kode_kuis']),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _hapusKuis(kuis['kode_kuis']),
+                            ),
+                            const Spacer(),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue[800],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () => _editKuisDanSoal(kuis),
+                              child: const Text('Kelola Soal', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

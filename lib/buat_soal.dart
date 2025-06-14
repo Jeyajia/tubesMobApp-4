@@ -130,16 +130,22 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Hapus Soal'),
+        title: const Text('Hapus Soal', style: TextStyle(fontWeight: FontWeight.bold)),
         content: const Text('Apakah Anda yakin ingin menghapus soal ini?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -173,13 +179,27 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
     );
   }
 
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
     );
   }
 
@@ -187,17 +207,24 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Kelola Kuis - ${widget.kodeKuis}'),
+        title: Text(
+          'Kelola Kuis - ${widget.kodeKuis}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
         actions: [
           if (_soalYangSedangDiedit != null)
             IconButton(
-              icon: const Icon(Icons.close),
+              icon: const Icon(Icons.close, color: Colors.white),
               onPressed: _resetFormSoal,
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -207,17 +234,24 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                     controller: _namaKuisController,
                     decoration: InputDecoration(
                       labelText: 'Nama Kuis',
-                      border: const OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       suffixIcon: IconButton(
-                        icon: const Icon(Icons.save),
+                        icon: const Icon(Icons.save, color: Colors.blue),
                         onPressed: _updateNamaKuis,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                     ),
                     onSubmitted: (_) => _updateNamaKuis(),
                   ),
                   const SizedBox(height: 24),
                   Card(
                     elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -233,14 +267,22 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                           const SizedBox(height: 16),
                           TextField(
                             controller: _pertanyaanController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Pertanyaan',
-                              border: OutlineInputBorder(),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
                             ),
                             maxLines: 3,
                           ),
                           const SizedBox(height: 16),
-                          const Text('Jawaban Benar:'),
+                          const Text(
+                            'Jawaban Benar:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
                               Radio<bool>(
@@ -250,6 +292,7 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                                     setState(() => _jawabanBenar = value!),
                               ),
                               const Text('Benar'),
+                              const SizedBox(width: 16),
                               Radio<bool>(
                                 value: false,
                                 groupValue: _jawabanBenar,
@@ -260,14 +303,24 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _simpanAtauUpdateSoal,
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 50),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _simpanAtauUpdateSoal,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue[800],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: Text(
+                                _soalYangSedangDiedit != null
+                                    ? 'Update Soal'
+                                    : 'Simpan Soal',
+                                style: const TextStyle(color: Colors.white),
+                              ),
                             ),
-                            child: Text(_soalYangSedangDiedit != null
-                                ? 'Update Soal'
-                                : 'Simpan Soal'),
                           ),
                         ],
                       ),
@@ -280,8 +333,18 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                   ),
                   const SizedBox(height: 16),
                   if (_soalList.isEmpty)
-                    const Center(
-                      child: Text('Belum ada soal'),
+                    Center(
+                      child: Column(
+                        children: [
+                          Image.asset('assets/images/empty_questions.png',
+                              height: 150),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Belum ada soal',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     )
                   else
                     ListView.builder(
@@ -292,16 +355,42 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                         final soal = _soalList[index];
                         return Card(
                           margin: const EdgeInsets.only(bottom: 16),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  soal['pertanyaan'] ?? '',
-                                  style: const TextStyle(fontSize: 16),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 30,
+                                      height: 30,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue[100],
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        soal['pertanyaan'] ?? '',
+                                        style: const TextStyle(fontSize: 16),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 Text(
                                   'Jawaban benar: ${soal['jawaban_benar'] == true ? 'Benar' : 'Salah'}',
                                   style: TextStyle(
@@ -309,17 +398,17 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
                                     fontSize: 14,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.edit, 
+                                      icon: const Icon(Icons.edit,
                                           color: Colors.blue),
                                       onPressed: () => _editSoal(soal),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.delete, 
+                                      icon: const Icon(Icons.delete,
                                           color: Colors.red),
                                       onPressed: () => _hapusSoal(soal['id']),
                                     ),
