@@ -127,165 +127,159 @@ class _SoalPageState extends State<SoalPage> {
 
   Future<void> _getUserData() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      try {
-        final response = await Supabase.instance.client
-            .from('users')
-            .select('Nim')
-            .eq('auth_id', user.id)
-            .maybeSingle();
-        
-        if (response != null && response['Nim'] != null) {
-          setState(() {
-            _userNim = response['Nim'].toString();
-          });
-          return;
-        }
-        
-        await Supabase.instance.client.auth.signOut();
+    if (user == null) {
+      if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      return;
+    }
+
+    try {
+      final response = await Supabase.instance.client
+          .from('users')
+          .select('nim, status')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response == null || response['status'] != 'student') {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Data pengguna tidak valid, silakan login ulang')),
+            const SnackBar(content: Text('Hanya mahasiswa yang dapat mengakses kuis')),
           );
-          Navigator.pushReplacementNamed(context, '/login');
+          Navigator.pop(context);
         }
-      } catch (e) {
+        return;
+      }
+
+      if (response['nim'] == null || response['nim'].isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Gagal memuat data pengguna')),
+            const SnackBar(content: Text('NIM belum terdaftar')),
           );
         }
+        return;
+      }
+
+      setState(() {
+        _userNim = response['nim'];
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
       }
     }
   }
 
   Future<void> _loadSoal(String kodeKuis) async {
+  setState(() {
+    _isLoading = true;
+    _showQuestions = false;
+  });
+
+  try {
+    // 1. Verifikasi kode kuis
+    final kuisData = await Supabase.instance.client
+        .from('kelas')
+        .select('mata_kuliah, kode_kuis')
+        .eq('kode_kuis', kodeKuis)
+        .maybeSingle(); // Gunakan maybeSingle() untuk handle null
+
+    if (kuisData == null) {
+      throw Exception('Kode kuis tidak ditemukan');
+    }
+
+    // 2. Ambil soal
+    final response = await Supabase.instance.client
+        .from('pertanyaan')
+        .select()
+        .eq('kode_kuis', kodeKuis)
+        .order('created_at', ascending: true);
+
+    if (response.isEmpty) {
+      throw Exception('Tidak ada soal untuk kuis ini');
+    }
+
     setState(() {
-      _isLoading = true;
-      _showQuestions = false;
+      _mataKuliah = kuisData['mata_kuliah'] ?? 'Tanpa Judul';
+      _soalList = List<Map<String, dynamic>>.from(response);
+      _jawabanMap = {for (var soal in _soalList) soal['id']: null};
+      _showQuestions = true;
     });
 
-    try {
-      final kuisData = await Supabase.instance.client
-          .from('kelas')
-          .select('mata_kuliah')
-          .eq('kode_kuis', kodeKuis)
-          .maybeSingle();
-
-      if (kuisData != null && kuisData['mata_kuliah'] != null) {
-        setState(() {
-          _mataKuliah = kuisData['mata_kuliah'];
-        });
-      }
-
-      final response = await Supabase.instance.client
-          .from('pertanyaan')
-          .select()
-          .eq('kode_kuis', kodeKuis)
-          .order('created_at', ascending: true);
-
-      setState(() {
-        _soalList = List<Map<String, dynamic>>.from(response);
-        _jawabanMap = {
-          for (var soal in _soalList) soal['id']: null
-        };
-        _showQuestions = true;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Kode kuis tidak valid atau tidak ada soal'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  } catch (e) {
+    setState(() {
+      _soalList = [];
+      _showQuestions = false;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(e.toString().replaceAll('Exception: ', '')),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
 
   Future<void> _submitJawaban() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Anda harus login terlebih dahulu')),
-        );
-      }
-      return;
-    }
+  if (_userNim == null || _userNim!.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('NIM tidak valid')),
+    );
+    return;
+  }
 
-    if (_userNim == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data pengguna tidak valid, silakan login ulang')),
-        );
-      }
-      return;
-    }
-    final nim = _userNim!;
+  if (_jawabanMap.values.any((jawaban) => jawaban == null)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Harap jawab semua pertanyaan')),
+    );
+    return;
+  }
 
-    if (_jawabanMap.values.any((jawaban) => jawaban == null)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Harap jawab semua pertanyaan')),
-        );
-      }
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      await Supabase.instance.client
-          .from('nilai')
-          .delete()
-          .eq('Nim', nim)
-          .eq('kode_kuis', _kodeKuisController.text);
-
-      final answers = _jawabanMap.entries.map((entry) => {
-        'Nim': nim,
+  setState(() => _isLoading = true);
+  
+  try {
+    final answers = _jawabanMap.entries.map((entry) {
+      final soal = _soalList.firstWhere((s) => s['id'] == entry.key);
+      return {
+        'nim': _userNim!,
         'kode_kuis': _kodeKuisController.text,
         'id_pertanyaan': entry.key,
-        'nilai': entry.value == true ? 10 : 0,
-        'created_at': DateTime.now().toIso8601String(),
-      }).toList();
+        'jawaban': entry.value,
+        'nilai': (entry.value == soal['jawaban_benar']) ? 10 : 0,
+        // Hapus user_id karena kolom belum ada
+      };
+    }).toList();
 
-      await Supabase.instance.client.from('nilai').insert(answers);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Jawaban berhasil disimpan!'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        setState(() {
-          _showQuestions = false;
-          _kodeKuisController.clear();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal menyimpan jawaban: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    await Supabase.instance.client
+        .from('nilai')
+        .upsert(answers);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Jawaban berhasil disimpan!')),
+    );
+    
+    // Reset state
+    setState(() {
+      _showQuestions = false;
+      _kodeKuisController.clear();
+      _jawabanMap = {};
+      _soalList = [];
+    });
+    
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Gagal menyimpan jawaban: ${e.toString().replaceAll('PostgrestException: ', '')}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    debugPrint('Error details: $e');
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -481,39 +475,6 @@ class _SoalPageState extends State<SoalPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Fitur scan QR akan datang'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                side: const BorderSide(color: Colors.blue),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.qr_code_scanner, color: Colors.blue),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Scan QR Code',
-                                    style: TextStyle(color: Colors.blue),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
                         ],
                       ),
               ),

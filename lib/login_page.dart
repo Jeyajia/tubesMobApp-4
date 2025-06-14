@@ -15,9 +15,7 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
 
   Future<void> signIn(String email, String password) async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
@@ -25,24 +23,44 @@ class _LoginPageState extends State<LoginPage> {
         password: password,
       );
 
-      if (response.user != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Login berhasil')));
+      if (response.user == null) {
+        throw Exception('Login gagal');
+      }
+
+      // Verifikasi status user
+      final userData = await Supabase.instance.client
+          .from('users')
+          .select('status, nim')
+          .eq('id', response.user!.id)
+          .single();
+
+      if (userData['status'] == 'student' && 
+          (userData['nim'] == null || userData['nim'].isEmpty)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Mahasiswa harus memiliki NIM yang valid')),
+          );
+          await Supabase.instance.client.auth.signOut();
+          return;
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login berhasil')),
+        );
         Navigator.pushReplacementNamed(context, '/home');
       }
     } on AuthException catch (error) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Terjadi kesalahan tak terduga')),
+        const SnackBar(content: Text('Terjadi kesalahan saat login')),
       );
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -64,11 +82,12 @@ class _LoginPageState extends State<LoginPage> {
               TextField(
                 controller: emailController,
                 decoration: InputDecoration(
-                  hintText: 'Email Address',
+                  hintText: 'Email',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
               TextField(
@@ -91,6 +110,12 @@ class _LoginPageState extends State<LoginPage> {
                         : () {
                             final email = emailController.text.trim();
                             final password = passwordController.text;
+                            if (email.isEmpty || password.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Email dan password harus diisi')),
+                              );
+                              return;
+                            }
                             signIn(email, password);
                           },
                     style: ElevatedButton.styleFrom(
@@ -110,11 +135,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           )
                         : const Text('Login'),
-                  ),
-                  const Icon(
-                    Icons.fingerprint,
-                    color: Colors.orangeAccent,
-                    size: 36,
                   ),
                 ],
               ),

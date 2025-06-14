@@ -34,21 +34,29 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
   }
 
   Future<void> _loadSoal() async {
-    setState(() => _isLoading = true);
-    try {
-      final response = await Supabase.instance.client
-          .from('pertanyaan')
-          .select()
-          .eq('kode_kuis', widget.kodeKuis)
-          .order('created_at', ascending: true);
+  setState(() => _isLoading = true);
+  try {
+    final response = await Supabase.instance.client
+        .from('pertanyaan')
+        .select('*') // Pastikan menggunakan select('*')
+        .eq('kode_kuis', widget.kodeKuis)
+        .order('created_at', ascending: true);
 
-      setState(() => _soalList = List<Map<String, dynamic>>.from(response));
-    } catch (e) {
-      _showError('Gagal memuat soal: $e');
-    } finally {
-      setState(() => _isLoading = false);
+    if (response != null && response.isNotEmpty) {
+      setState(() {
+        _soalList = List<Map<String, dynamic>>.from(response);
+        print('Data soal loaded: ${_soalList.length} items'); // Debug
+      });
+    } else {
+      setState(() => _soalList = []);
     }
+  } catch (e) {
+    print('Error loading soal: $e'); // Debug
+    _showError('Gagal memuat soal: ${e.toString()}');
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
 
   Future<void> _updateNamaKuis() async {
     if (_namaKuisController.text.isEmpty) {
@@ -64,52 +72,57 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
           .eq('id', widget.kuisId);
       _showSuccess('Nama kuis berhasil diperbarui');
     } catch (e) {
-      _showError('Gagal memperbarui nama kuis: $e');
+      _showError('Gagal memperbarui nama kuis: ${e.toString()}');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _simpanAtauUpdateSoal() async {
-    if (_pertanyaanController.text.isEmpty) {
-      _showError('Pertanyaan tidak boleh kosong');
-      return;
+  if (_pertanyaanController.text.isEmpty) {
+    _showError('Pertanyaan tidak boleh kosong');
+    return;
+  }
+
+  setState(() => _isLoading = true);
+  try {
+    final soalData = {
+      'kode_kuis': widget.kodeKuis,
+      'pertanyaan': _pertanyaanController.text,
+      'gambar_path': _gambarPath,
+      'jawaban_benar': _jawabanBenar,
+    };
+
+    if (_soalYangSedangDiedit != null) {
+      await Supabase.instance.client
+          .from('pertanyaan')
+          .update(soalData)
+          .eq('id', _soalYangSedangDiedit!)
+          .select(); // Tambahkan .select()
+    } else {
+      await Supabase.instance.client
+          .from('pertanyaan')
+          .insert(soalData)
+          .select(); // Tambahkan .select()
     }
 
-    setState(() => _isLoading = true);
-    try {
-      if (_soalYangSedangDiedit != null) {
-        // Update soal yang ada
-        await Supabase.instance.client
-            .from('pertanyaan')
-            .update({
-              'pertanyaan': _pertanyaanController.text,
-              'gambar_path': _gambarPath,
-              'jawaban_benar': _jawabanBenar,
-            })
-            .eq('id', _soalYangSedangDiedit!);
-        _showSuccess('Soal berhasil diperbarui');
-      } else {
-        // Tambah soal baru
-        await Supabase.instance.client.from('pertanyaan').insert({
-          'kode_kuis': widget.kodeKuis,
-          'pertanyaan': _pertanyaanController.text,
-          'gambar_path': _gambarPath,
-          'teks_true': 'Benar',
-          'teks_false': 'Salah',
-          'jawaban_benar': _jawabanBenar,
-        });
-        _showSuccess('Soal berhasil ditambahkan');
-      }
+    // Paksa rebuild widget dengan data terbaru
+    await _loadSoal();
+    _resetFormSoal();
+    
+    _showSuccess(_soalYangSedangDiedit != null 
+        ? 'Soal berhasil diperbarui' 
+        : 'Soal berhasil ditambahkan');
 
-      _resetFormSoal();
-      await _loadSoal();
-    } catch (e) {
-      _showError('Gagal menyimpan soal: $e');
-    } finally {
+  } catch (e) {
+    print('Error saving soal: $e'); // Debug
+    _showError('Gagal menyimpan soal: ${e.toString()}');
+  } finally {
+    if (mounted) {
       setState(() => _isLoading = false);
     }
   }
+}
 
   void _editSoal(Map<String, dynamic> soal) {
     setState(() {
@@ -118,7 +131,6 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
       _jawabanBenar = soal['jawaban_benar'] ?? true;
       _gambarPath = soal['gambar_path'];
     });
-    // Scroll ke form
     Scrollable.ensureVisible(
       context,
       duration: const Duration(milliseconds: 300),
@@ -158,10 +170,11 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
             .from('pertanyaan')
             .delete()
             .eq('id', id);
-        _showSuccess('Soal berhasil dihapus');
+        
         await _loadSoal();
+        _showSuccess('Soal berhasil dihapus');
       } catch (e) {
-        _showError('Gagal menghapus soal: $e');
+        _showError('Gagal menghapus soal: ${e.toString()}');
       } finally {
         setState(() => _isLoading = false);
       }
@@ -178,6 +191,7 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
   }
 
   void _showError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -191,6 +205,7 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
   }
 
   void _showSuccess(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -222,9 +237,7 @@ class _BuatSoalPageState extends State<BuatSoalPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(

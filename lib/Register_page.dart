@@ -24,44 +24,68 @@ class _RegisterPageState extends State<RegisterPage> {
     final nim = nimController.text.trim();
     final selectedStatus = status;
 
-    if (email.isEmpty || password.isEmpty || selectedStatus == null) {
+    if (email.isEmpty || 
+        password.isEmpty || 
+        selectedStatus == null || 
+        nama.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Harap lengkapi semua data')),
       );
       return;
     }
 
-    setState(() {
-      isLoading = true;
-    });
+    // Validasi khusus untuk student harus punya NIM
+    if (selectedStatus == 'student' && nim.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mahasiswa harus memiliki NIM')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
 
     try {
-      final response = await Supabase.instance.client.auth.signUp(
+      // 1. Daftar user di Auth
+      final authResponse = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
-        data: {'nama': nama, 'nim': nim, 'status': selectedStatus},
       );
 
-      if (response.user != null) {
+      if (authResponse.user == null) {
+        throw Exception('Gagal membuat akun');
+      }
+
+      // 2. Simpan data tambahan di tabel users
+      final response = await Supabase.instance.client.from('users').insert({
+        'id': authResponse.user!.id,
+        'nama': nama,
+        'nim': nim.isNotEmpty ? nim : null, // Ubah ini
+        'status': selectedStatus,
+      }).select();
+
+      if (response.isEmpty) {
+        throw Exception('Gagal menyimpan data user');
+      }
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registrasi berhasil! Silakan login.')),
         );
         Navigator.pop(context); // kembali ke login
       }
     } on AuthException catch (error) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Terjadi kesalahan tak terduga')),
+        SnackBar(content: Text('Terjadi kesalahan: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) setState(() => isLoading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -82,14 +106,15 @@ class _RegisterPageState extends State<RegisterPage> {
               // Nama
               TextField(
                 controller: namaController,
-                decoration: inputDecoration('Nama'),
+                decoration: inputDecoration('Nama Lengkap'),
               ),
               const SizedBox(height: 12),
 
               // NIM
               TextField(
                 controller: nimController,
-                decoration: inputDecoration('Nim'),
+                decoration: inputDecoration('NIM (untuk mahasiswa)'),
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 12),
 
@@ -98,13 +123,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 decoration: inputDecoration('Status'),
                 value: status,
                 items: const [
-                  DropdownMenuItem(value: 'user', child: Text('User')),
-                  DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
+                  DropdownMenuItem(value: 'student', child: Text('Mahasiswa')),
+                  DropdownMenuItem(value: 'teacher', child: Text('Dosen')),
                 ],
                 onChanged: (value) {
-                  setState(() {
-                    status = value;
-                  });
+                  setState(() => status = value);
                 },
               ),
               const SizedBox(height: 12),
@@ -113,6 +136,7 @@ class _RegisterPageState extends State<RegisterPage> {
               TextField(
                 controller: emailController,
                 decoration: inputDecoration('Email'),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 12),
 
